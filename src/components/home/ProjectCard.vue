@@ -7,37 +7,20 @@
       <div class="flex justify-between items-center gap-2">
         <!-- Editor icon (picker trigger) + project name -->
         <div class="flex items-center gap-[0.3rem] min-w-0" @click.stop>
-          <div class="relative shrink-0">
-            <button
-              type="button"
-              :title="badgeTitle"
-              :class="[
-                'h-5 w-5 inline-flex items-center justify-center rounded border transition-colors duration-150 cursor-pointer',
-                editorExplicit
-                  ? 'border-yellow-500/60 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20'
-                  : editorHint
-                    ? 'border-yellow-500/30 bg-yellow-500/5 text-yellow-500/60 hover:bg-yellow-500/10 hover:text-yellow-400'
-                    : 'border-dashed border-neutral-600/50 text-neutral-600 hover:border-yellow-500/30 hover:text-yellow-500/50',
-              ]"
-              @click="openPicker"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true">
-                <path :d="currentIcon" fill="currentColor" />
-              </svg>
-            </button>
+          <EditorPicker
+            :editors="availableEditors"
+            :selected-id="editorHint"
+            :explicit="editorExplicit"
+            :loading="loadingEditors"
+            @open="loadEditors"
+            @select="setEditor"
+            @clear="clearEditor"
+          />
 
-            <EditorPicker
-              v-if="showPicker"
-              :editors="availableEditors"
-              :selected-id="editorHint"
-              :explicit="editorExplicit"
-              :loading="loadingEditors"
-              @select="setEditor"
-              @clear="clearEditor"
-            />
-          </div>
-
-          <p class="m-0 text-white text-sm font-semibold truncate" @click.stop="emit('open', project.path, editorHint)">
+          <p
+            class="m-0 text-white text-sm font-semibold truncate"
+            @click.stop="emit('open', project.path, editorHint)"
+          >
             {{ project.name }}
           </p>
         </div>
@@ -56,6 +39,13 @@
       </div>
 
       <div class="flex items-center gap-2 mt-[0.1rem] min-w-0">
+        <IconButton
+          :icon="mdiMicrosoftVisualStudioCode"
+          :size="13"
+          title="Open in VS Code"
+          custom-class="h-5 w-5 rounded border border-yellow-500/60 bg-yellow-500/10 text-yellow-400 transition-colors duration-150 hover:bg-yellow-500/20"
+          @click.stop="openInVSCode"
+        ></IconButton>
         <IconLabel
           :icon="mdiFolder"
           :clickable="true"
@@ -69,20 +59,29 @@
       </div>
     </div>
   </div>
-
-  <!-- Click-outside overlay -->
-  <div v-if="showPicker" class="fixed inset-0 z-40" @click="showPicker = false" />
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { mdiSourceBranch, mdiFolder } from "@mdi/js";
+import {
+  mdiSourceBranch,
+  mdiFolder,
+  mdiMicrosoftVisualStudioCode,
+} from "@mdi/js";
 import IconLabel from "@/components/common/IconLabel.vue";
 import EditorPicker from "@/components/common/EditorPicker.vue";
-import { type EditorInfo, editorIcon } from "@/util/editors";
+import { type EditorInfo } from "@/util/editors";
+import IconButton from "../common/IconButton.vue";
 
 const props = defineProps<{
-  project: { name: string; path: string; branch?: string; group: string; editorHint?: string; editorExplicit?: boolean };
+  project: {
+    name: string;
+    path: string;
+    branch?: string;
+    group: string;
+    editorHint?: string;
+    editorExplicit?: boolean;
+  };
 }>();
 
 const emit = defineEmits<{
@@ -91,10 +90,11 @@ const emit = defineEmits<{
 
 // autoHint is the hint from workspace file detection (no explicit override).
 // We preserve it so "reset to auto-detect" can restore it without a reload.
-const autoHint = props.project.editorExplicit ? undefined : props.project.editorHint;
+const autoHint = props.project.editorExplicit
+  ? undefined
+  : props.project.editorHint;
 const editorHint = ref(props.project.editorHint);
 const editorExplicit = ref(props.project.editorExplicit ?? false);
-const showPicker = ref(false);
 const availableEditors = ref<EditorInfo[]>([]);
 const loadingEditors = ref(false);
 
@@ -104,16 +104,7 @@ const relativePath = computed(() => {
   return parts.length >= 2 ? parts[parts.length - 2] : p;
 });
 
-const currentIcon = computed(() => editorIcon(editorHint.value ?? ""));
-
-const badgeTitle = computed(() => {
-  if (editorExplicit.value) return "Set by .shelf — click to change";
-  if (editorHint.value) return "Auto-detected — click to override";
-  return "Set editor for this project";
-});
-
-async function openPicker() {
-  showPicker.value = true;
+async function loadEditors() {
   if (availableEditors.value.length === 0) {
     loadingEditors.value = true;
     try {
@@ -128,14 +119,16 @@ async function setEditor(id: string) {
   await (window.api.settings as any).setProjectEditor(props.project.path, id);
   editorHint.value = id;
   editorExplicit.value = true;
-  showPicker.value = false;
 }
 
 async function clearEditor() {
   await (window.api.settings as any).setProjectEditor(props.project.path, null);
   editorHint.value = autoHint;
   editorExplicit.value = false;
-  showPicker.value = false;
+}
+
+async function openInVSCode() {
+  await window.api.fs.openInEditor(props.project.path, "vscode");
 }
 
 async function openFolder() {
