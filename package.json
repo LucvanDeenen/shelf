@@ -41,7 +41,7 @@
     "electron-builder": "^26.7.0",
     "pinia": "^3.0.3",
     "pinia-plugin-persistedstate": "^4.3.0",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.0",
     "tailwindcss": "^4.1.16",
     "to-ico": "^1.0.1",
     "typescript": "^5.2.2",
